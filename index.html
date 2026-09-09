@@ -236,6 +236,25 @@
   button.btn.tiny{padding:2px 7px;font-size:12.5px}
   .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 
+  /* ---------- exemplar reference panels ---------- */
+  .exemplar{
+    border:1px dashed var(--rule);border-radius:2px;padding:2px 12px;margin:4px 0 18px;
+    background:color-mix(in srgb, var(--card) 92%, var(--stamp) 8%);
+  }
+  .exemplar summary{
+    cursor:pointer;font-size:12.5px;font-weight:600;color:var(--stamp);
+    padding:8px 0;list-style:none;
+  }
+  .exemplar summary::-webkit-details-marker{display:none}
+  .exemplar summary::before{content:"\2192  ";}
+  .exemplar[open] summary::before{content:"\2193  ";}
+  .exemplar-body{padding-bottom:10px}
+  .exemplar-text{font-size:13.5px;line-height:1.5;color:var(--ink);white-space:pre-wrap;margin:6px 0}
+  .exemplar-body ul.exemplar-text{padding-left:18px;white-space:normal}
+  .exemplar-body ul.exemplar-text li{margin-bottom:4px}
+  .exemplar-table{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0}
+  .exemplar-table td{border:1px solid var(--rule);padding:6px 8px;vertical-align:top}
+
   /* ---------- repeaters ---------- */
   .item{
     background:var(--card);border:1px solid var(--rule);border-radius:2px;
@@ -398,6 +417,13 @@ const mmss = sec => {
   const s = Math.max(0, Math.round(sec));
   return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
 };
+/* MiniMax H3's own cut-marker format: "At 00:03.500," — zero-padded MM:SS.mmm */
+const mmssms = sec => {
+  const s = Math.max(0, sec);
+  const m = Math.floor(s / 60);
+  const rem = s - m * 60;
+  return String(m).padStart(2, "0") + ":" + rem.toFixed(3).padStart(6, "0");
+};
 let toastTimer;
 const toast = msg => {
   const t = document.getElementById("toast");
@@ -421,13 +447,99 @@ const SAFETY_BLOCK =
 
 const VIDEO_CHECKS = [
   "Params line has all flags, and length / fps equals the final timecode.",
-  "Shot 1 opens with a style header before the cast.",
-  "Every shot has [Shot N], a timecode range, and physical action.",
-  "Every spoken line has a speaker ID and a language tag.",
+  "Style header precedes [Shot 1] as its own sentence; [Shot 1] itself has no timestamp.",
+  "Every shot has [Shot N], later shots carry \"At MM:SS.mmm,\", and every shot has physical action.",
+  "Every spoken line has a speaker ID and a language tag, wrapped in \\<d\\>...</d> with the opening tag escaped.",
   "At least one on-screen text card.",
   "overall_soundscape and non_diegetic_music are both present.",
   "Nothing follows non_diegetic_music."
 ];
+
+/* ------------------------------------------------- worked-skill exemplars */
+/* Sourced from a real shipped skill (Japanese Commercial, videoturbo-h3),
+   shown next to each blank field so a new author has something to pattern-
+   match against instead of an empty box and a one-line hint. */
+const EX_SOURCE = "Japanese Commercial skill";
+const EXEMPLAR = {
+  purpose: {
+    why: "States the workflow, the genre's own ‘grammar’, and a hard stylistic rule in three sentences — nothing decorative.",
+    text: "Generate Japanese television commercials using the /run:videoturbo-h3 command. Take a product, a joke, or a one-line request and explode it into a full CM: a shot-by-shot description with timecodes, spoken Japanese dialogue, on-screen text, sound design, and a jingle.\n\nJapanese commercials are their own grammar. They are short, loud, structurally rigid, and emotionally shameless. The model responds to that grammar. Write dense, specific, physical description, and never hedge on the absurdity."
+  },
+  guidanceStyle: {
+    why: "Names the exact opening move (a style header before any shot marker, then cast inside [Shot 1] itself) and the per-shot skeleton — not just ‘describe the shot’. MiniMax H3 never accepts the style header glued onto [Shot 1]; it's a free sentence that precedes it, confirmed against an independent open-source H3 prompt builder's field logic.",
+    text: "Before any [Shot] marker, one to two sentences establish the overall visual style, e.g. “Wildly energetic Japanese television commercial, bright saturated colors, absurd physical comedy, ultra-fast editing, exaggerated reactions, polished live-action production.” Then [Shot 1] opens with cast and setting — ages, clothing, expressions — specific beats generic (“three cheerful Japanese men in their late 60s and 70s in colorful tracksuits” beats “some old guys”). [Shot 1] carries no timestamp. Every shot after that opens “[Shot N] At MM:SS.mmm,” followed by physical action in present tense — what the camera does and what the bodies do — and on-screen text where relevant."
+  },
+  guidanceDialogue: {
+    why: "Locks the speaker-ID convention and gives a hard, checkable constraint (mora count) instead of a vague ‘keep it short’.",
+    text: "Dialogue format: speaker description, then a speaker ID, then the language tag, then the line. Keep one ID (e.g. S1) as the announcer across the whole spot; other IDs are talent. Reuse IDs consistently so the voices stay stable.\n\nLine length: 4 to 12 mora. A line is a shout, not a sentence — a full clause with a subordinate phrase won’t fit in two seconds and will get mangled."
+  },
+  graydientEscaping: {
+    why: "Graydient reads the whole message looking for <lora-name> tags to activate. An unescaped literal “<” reads as the start of one — so any other bracket syntax in the prompt (MiniMax's own <d> dialogue wrapper included) has to escape its OPENING bracket with a backslash to survive that scan. The closing </d> starts with “</”, which never matches the LoRA-tag pattern, so it's left plain. This isn't a MiniMax rule — it's Graydient's own message parser, underneath whatever workflow you target.",
+    text: "integrated_multimodal_description: [Shot 1] Live-action, cinematic, mockumentary style, a medium shot frames Michael Scott sitting in his office chair speaking directly to the camera with a handheld feel. The middle-aged man with a confident slightly nasal voice (S1) says: \\<d\\>[English] Pam! I heard you're going to South Africa so I got you a present.</d> The handheld camera pans right onto a dirty couch. [Shot 2] At 00:04.000, the shot holds on the couch, a young woman with a soft hesitant voice is heard speaking off camera (S2): \\<d\\>[English] uhm, you got me a dirty couch?</d>\n\noverall_soundscape: Quiet office ambience with distant keyboard typing and air conditioning hum. Soft fabric rustle from clothing movement and slight chair creaks accompany the gestures.\n\nnon_diegetic_music: N/A"
+  },
+  graydientSlots: {
+    why: "Graydient's commands are parsed out of a Telegram message, not a real argument vector — there's no quoting. Every /slot1: through /slot9: is a MULTIFORMAT field with no fixed shape (a second prompt, a list, a URL, a dropdown value — whatever the workflow author needs), so the only way its parser knows where a slot's value ends is: everything from right after /slotN: up to the next recognized /flag: (or the end of the message) belongs to that slot. There is no delimiter, no closing tag, no quoting.",
+    text: "/workflow /run:some-workflow /size:832x480 /slot1:first value here /slot2:second value, this all belongs to slot2 including this comma and this colon-like: bit, right up to the end of the message\n\nConsequences this tool has to respect once a video skill ever adds slots:\n1. Every /flag: and /slotN: goes on the params line, in front of the freeform prompt body — never after it or interleaved inside it. Whatever text follows the LAST recognized flag becomes the entire remaining prompt (this is exactly why non_diegetic_music has to be the last field: there's nothing after it to accidentally get swallowed).\n2. A slot's own freeform value must never contain something that looks like another flag (a literal \"/slot2:\" or \"/fps:\" typed inside slot1's text) — the parser will read it as a new flag boundary and truncate slot1 there.\n3. Slot order is fixed by position, not by name — /slot2 without a preceding /slot1 still just means \"the second recognized flag,\" so define slots in the skill in the same order the command emits them."
+  },
+  guidanceSound: {
+    why: "Gives a quantity (‘eight to fifteen items’) and a register (‘maximalist’), which is far more actionable than ‘describe the ambient sound’.",
+    text: "Diegetic sound only, as a dense comma list: impacts, whooshes, footsteps, sizzle, slurping, ice clinking, crowd cheers, applause, comedic boings, camera shutter clicks, door slams. This genre's sound design is maximalist — list eight to fifteen items, not two or three."
+  },
+  guidanceMusic: {
+    why: "A vocabulary list plus one hard rule (always name the ending) beats an abstract mood description — the model can't act on ‘make it feel triumphant’.",
+    text: "Name the instrumentation and the energy, and always name the ending sting. Reference vocabulary: hyperactive upbeat commercial jingle, brass stabs, handclaps, taiko percussion, cheerful marimba, koto plucks, 80s synth brass, city pop chorus, and a ridiculously triumphant final sting. If the brand name is sung at the end, say so."
+  },
+  archetypes: {
+    why: "Ten mutually exclusive modes. Each name instantly cues a cast, and the beat structure reads like a checklist, not a mood board.",
+    rows: [
+      { name: "Absurd sports contest", cast: "Ordinary people treating a trivial act as an Olympic final", beats: "Prep, whistle, hyper-serious competition, victory dance, product mountain" },
+      { name: "Sizzle food", cast: "One person eating, close-up dominant", beats: "Macro sizzle, first bite, eyes widen, exclamation, product beauty shot" },
+      { name: "Beer / refreshment", cast: "Coworkers or a couple, evening", beats: "Work exhaustion, pour with condensation macro, toast, gulp, relief shout, sunset" },
+      { name: "Talking animal or mascot", cast: "A pet or costumed mascot living in a normal family", beats: "Family problem, animal delivers the pitch deadpan, family shock, price graphic" },
+      { name: "Infomercial slam", cast: "Loud host plus an over-reacting assistant", beats: "Shock intro, demo, assistant screams, price crossed out and slammed lower, phone number" },
+      { name: "Heroic transformation", cast: "Exhausted everyman, transformation", beats: "Defeat, product consumed, sudden larger-than-life imagery, triumphant shout" },
+      { name: "Emotional family", cast: "Three generations, kitchen or station platform", beats: "Quiet moment, memory flash, product as the connector, single tear, soft tagline" }
+    ]
+  },
+  bank: {
+    why: "Clustered by function (opener / reaction / tagline / sales), not by topic — so a writer picks the right register for the beat they're on.",
+    rows: [
+      { label: "Openers", items: "Are you ready!? / New arrival! / What a surprise! / At last, the day has come." },
+      { label: "Reactions", items: "Whoa! / Delicious! / Amazing! / So good! / Ahh, that hit the spot!" },
+      { label: "Taglines", items: "More freedom, every day. / Still going strong. / For the whole family. / Tomorrow changes." },
+      { label: "Sales", items: "Limited time! / Only now! / Just $X! / Free shipping! / Call now! / Details online." }
+    ]
+  },
+  rules: {
+    why: "Short imperative lines that name a specific failure mode to avoid, not a general aspiration.",
+    lines: [
+      "Physical comedy beats verbal comedy. The model renders bodies, not wordplay — write the knuckle crack, the spit-take.",
+      "One product, one promise. Every spot resolves to a product shot and a single benefit.",
+      "Escalate every shot. Bigger each time, never sideways.",
+      "The last shot is a freeze or a slam. Freeze-frame at the funniest moment, or a hard cut to the package with graphics crashing in.",
+      "Faces sell it. Specify an expression on every shot: deadly serious, bewildered, ecstatic, blissful.",
+      "Absurd requests get played straight. The comedy comes from sincere production values, not a wink at the camera."
+    ]
+  },
+  example: {
+    why: "One full worked example: style header → cast → escalating shots → oversized product shot → freeze/slam ending.",
+    build: S => ({
+      id: uid(), title: "Absurd sports contest — example product",
+      size: S.defaults.size, fps: S.defaults.fps, seed: rollSeed(),
+      styleHeader: "Wildly energetic commercial, bright saturated colors, absurd physical comedy, ultra-fast editing, exaggerated reactions, polished live-action production.",
+      cast: "Three cheerful people in their late 60s and 70s stand shoulder-to-shoulder in an impossibly dramatic sports stadium wearing colorful tracksuits, looking intensely serious.",
+      shots: [
+        { id: uid(), dur: 2, action: "Extreme close-ups rapidly cut between determined faces. One cracks their knuckles. Another tightens a headband.", osdType: "none", osdText: "", lines: [{ id: uid(), who: "A booming announcer", sid: "S1", lang: "English", text: "Are you ready!?" }] },
+        { id: uid(), dur: 2, action: "A starting pistol fires. All three explode forward into an absurdly intense sprint in exaggerated slow motion.", osdType: "none", osdText: "", lines: [] },
+        { id: uid(), dur: 2, action: "Smash cut to one of them performing an outrageous victory dance in a crowded plaza. Pedestrians stop and applaud in bewilderment.", osdType: "brackets", osdText: "SAFE! COMFORTABLE! FREE!", lines: [] },
+        { id: uid(), dur: 2, action: "Cut to an absurd heroic product shot on a mountaintop at sunrise; a giant pristine product package rises behind them like a monumental movie prop.", osdType: "none", osdText: "", lines: [{ id: uid(), who: "One gives an enthusiastic thumbs-up and says", sid: "S2", lang: "English", text: "Still going strong!" }] },
+        { id: uid(), dur: 2, action: "Freeze-frame at the funniest moment as huge colorful product graphics slam onto the screen.", osdType: "none", osdText: "", lines: [{ id: uid(), who: "The announcer triumphantly shouts", sid: "S1", lang: "English", text: "More freedom, every day!" }] }
+      ],
+      soundscape: "Explosive starting pistol, rapid footsteps, exaggerated whooshes, crowd cheers, comedic impact sounds, enthusiastic shouting, applause, camera shutter clicks.",
+      music: "Hyperactive upbeat commercial jingle with brass, synths, handclaps, taiko-style percussion, and a ridiculously triumphant final sting."
+    })
+  }
+};
 
 const newShot = (dur = 3) => ({
   id: uid(), dur,
@@ -493,13 +605,17 @@ function emitCommand(ex) {
 function emitShotBody(ex) {
   const times = shotTimes(ex);
   const out = [];
+  /* The style header is its own sentence before [Shot 1] — MiniMax H3 never
+     accepts it glued onto the shot marker. [Shot 1] itself carries no
+     timestamp; only [Shot 2]+ open with "At MM:SS.mmm,". */
+  if (clean(ex.styleHeader)) out.push(clean(ex.styleHeader));
   ex.shots.forEach((sh, i) => {
     const bits = ["[Shot " + (i + 1) + "]"];
     if (i === 0) {
-      if (clean(ex.styleHeader)) bits.push(clean(ex.styleHeader));
       if (clean(ex.cast)) bits.push(clean(ex.cast));
+    } else {
+      bits.push("At " + mmssms(times[i].from) + ",");
     }
-    bits.push(times[i].label);
     if (clean(sh.action)) bits.push(clean(sh.action));
     if (sh.osdType !== "none" && clean(sh.osdText)) {
       const t = clean(sh.osdText);
@@ -511,7 +627,11 @@ function emitShotBody(ex) {
     sh.lines.forEach(l => {
       if (!clean(l.text)) return;
       const who = clean(l.who) || "A voice says";
-      bits.push(who + " (" + clean(l.sid) + "): [" + clean(l.lang) + "] " + clean(l.text));
+      /* Graydient scans messages for <lora-name> tags; an unescaped literal
+         "<" reads as one. The opening \<d\> needs the backslash to survive
+         that scan — the closing </d> starts with "</" so it never matches
+         the LoRA-tag pattern and is left as-is. */
+      bits.push(who + " (" + clean(l.sid) + "): \\<d\\>[" + clean(l.lang) + "] " + clean(l.text) + "</d>");
     });
     out.push(bits.join(" "));
   });
@@ -537,12 +657,14 @@ function emitDoc() {
     L.push("## Output Format", "", "```",
       "/workflow /run:" + S.run + " /size:" + S.defaults.size + " /seed:000000 /length:288 /fps:" + S.defaults.fps,
       "", "integrated_multimodal_description:",
-      "[Shot 1] <style header, cast, setting>",
-      "0:00" + DASH + "0:03 <action>",
-      "<Speaker> (S1): [English] <line>", "", "[Shot 2]", "...", "",
+      "<style header — 1-2 sentences, before any [Shot] marker>",
+      "[Shot 1] <cast, setting, action — no timestamp on shot 1>",
+      "<Speaker> (S1): [English] <line>", "",
+      "[Shot 2] At 00:03.500, <action continues>", "...", "",
       "overall_soundscape: <diegetic sound design>", "",
       "non_diegetic_music: <score, or the absence of one>", "```", "",
       "Field order matters. Nothing after `non_diegetic_music`.", "",
+      "**Style header precedes `[Shot 1]`** as its own sentence — never glued onto the shot marker. **`[Shot 1]` carries no timestamp.** Every later shot opens `[Shot N] At MM:SS.mmm, ...`.", "",
       "**Duration math**: seconds = length / fps. Set the timecodes to match exactly.", "");
     const g = S.guidance;
     if (clean(g.style) || clean(g.dialogue) || clean(g.sound) || clean(g.music)) {
@@ -630,7 +752,7 @@ function audit() {
     const secs = exSeconds(ex), frames = exFrames(ex), fps = Number(ex.fps) || 24;
     push(Math.abs(frames / fps - secs) < 0.001, tag + ": length / fps matches final timecode",
       frames + " frames \u00F7 " + fps + " fps = " + mmss(frames / fps) + ", shots end " + mmss(secs) + ".");
-    push(!!clean(ex.styleHeader), tag + ": Shot 1 has a style header",
+    push(!!clean(ex.styleHeader), tag + ": has a style header before [Shot 1]",
       clean(ex.styleHeader) ? "" : "Sets the look for the whole clip.");
     const noAction = ex.shots.filter(s => !clean(s.action)).length;
     push(noAction === 0, tag + ": every shot has physical action",
@@ -714,6 +836,23 @@ function listEditor(label, hint, arr, onChange, ph) {
   return wrap;
 }
 
+/* --------------------------------------------------------- exemplar panel */
+function exemplarPanel(why, body, insertLabel, onInsert, source) {
+  const d = el("details", { class: "exemplar" });
+  d.appendChild(el("summary", {}, "Reference: " + (source || EX_SOURCE)));
+  const inner = el("div", { class: "exemplar-body" });
+  inner.appendChild(el("p", { class: "hint" }, why));
+  inner.appendChild(body);
+  if (onInsert) {
+    inner.appendChild(el("div", { class: "acts" }, [
+      el("button", { class: "btn tiny", onclick: () => { onInsert(); renderForm(); paintOutput(); } }, insertLabel || "Insert this")
+    ]));
+  }
+  d.appendChild(inner);
+  return d;
+}
+const exemplarText = t => el("p", { class: "exemplar-text" }, t);
+
 /* ------------------------------------------------------------ section: UI */
 function renderForm() {
   const pane = document.getElementById("pane");
@@ -739,6 +878,10 @@ function renderForm() {
     add(el("h2", {}, "Purpose"));
     add(el("p", { class: "lede" }, "What the skill turns a one-line request into, and what it refuses. Written to be read by the model, not by a person."));
     add(txt("Purpose", "", () => S.purpose, v => S.purpose = v, { area: true, rows: 12 }));
+    if (S.kind === "video") {
+      add(exemplarPanel(EXEMPLAR.purpose.why, exemplarText(EXEMPLAR.purpose.text), "Insert into Purpose",
+        () => { S.purpose = clean(S.purpose) ? S.purpose + "\n\n" + EXEMPLAR.purpose.text : EXEMPLAR.purpose.text; }));
+    }
   }
 
   if (s === "params") {
@@ -749,6 +892,7 @@ function renderForm() {
         () => S.defaults.size, v => S.defaults.size = v));
       add(pick("Default fps", ["24", "30"], () => String(S.defaults.fps), v => S.defaults.fps = Number(v)));
       add(el("p", { class: "hint" }, "Frame counts are computed from shot durations, so you never type a /length: value by hand."));
+      add(exemplarPanel(EXEMPLAR.graydientSlots.why, exemplarText(EXEMPLAR.graydientSlots.text), null, null, "Graydient platform mechanics"));
     } else {
       add(pick("Default size", ["1024x1024", "896x1152", "1152x896"], () => S.defaults.size, v => S.defaults.size = v));
       add(num("Images per run", () => S.defaults.images, v => S.defaults.images = Number(v), { min: 1 }));
@@ -760,9 +904,18 @@ function renderForm() {
       add(el("h2", {}, "Field guidance"));
       add(el("p", { class: "lede" }, "How the model should write each part. This is the section that actually shapes output quality."));
       add(txt("Style header and shot construction", "", () => S.guidance.style, v => S.guidance.style = v, { area: true, rows: 7 }));
+      add(exemplarPanel(EXEMPLAR.guidanceStyle.why, exemplarText(EXEMPLAR.guidanceStyle.text), "Insert into Style",
+        () => { S.guidance.style = clean(S.guidance.style) ? S.guidance.style + "\n\n" + EXEMPLAR.guidanceStyle.text : EXEMPLAR.guidanceStyle.text; }));
       add(txt("Dialogue", "Format, speaker IDs, line length.", () => S.guidance.dialogue, v => S.guidance.dialogue = v, { area: true, rows: 6 }));
+      add(exemplarPanel(EXEMPLAR.guidanceDialogue.why, exemplarText(EXEMPLAR.guidanceDialogue.text), "Insert into Dialogue",
+        () => { S.guidance.dialogue = clean(S.guidance.dialogue) ? S.guidance.dialogue + "\n\n" + EXEMPLAR.guidanceDialogue.text : EXEMPLAR.guidanceDialogue.text; }));
+      add(exemplarPanel(EXEMPLAR.graydientEscaping.why, exemplarText(EXEMPLAR.graydientEscaping.text), null, null, "Graydient platform mechanics"));
       add(txt("overall_soundscape", "", () => S.guidance.sound, v => S.guidance.sound = v, { area: true, rows: 5 }));
+      add(exemplarPanel(EXEMPLAR.guidanceSound.why, exemplarText(EXEMPLAR.guidanceSound.text), "Insert into overall_soundscape",
+        () => { S.guidance.sound = clean(S.guidance.sound) ? S.guidance.sound + "\n\n" + EXEMPLAR.guidanceSound.text : EXEMPLAR.guidanceSound.text; }));
       add(txt("non_diegetic_music", "", () => S.guidance.music, v => S.guidance.music = v, { area: true, rows: 5 }));
+      add(exemplarPanel(EXEMPLAR.guidanceMusic.why, exemplarText(EXEMPLAR.guidanceMusic.text), "Insert into non_diegetic_music",
+        () => { S.guidance.music = clean(S.guidance.music) ? S.guidance.music + "\n\n" + EXEMPLAR.guidanceMusic.text : EXEMPLAR.guidanceMusic.text; }));
     } else {
       add(el("h2", {}, "Prompt method"));
       add(el("p", { class: "lede" }, "How to expand what the user said into a full prompt."));
@@ -788,6 +941,12 @@ function renderForm() {
     add(el("div", { class: "acts" }, [
       el("button", { class: "btn", onclick: () => { S.archetypes.push({ id: uid(), name: "", cast: "", beats: "" }); renderForm(); } }, "Add archetype")
     ]));
+    const tbl = el("table", { class: "exemplar-table" });
+    EXEMPLAR.archetypes.rows.forEach(r => tbl.appendChild(el("tr", {}, [
+      el("td", {}, r.name), el("td", {}, r.cast), el("td", {}, r.beats)
+    ])));
+    add(exemplarPanel(EXEMPLAR.archetypes.why, tbl, "Insert these archetypes",
+      () => { EXEMPLAR.archetypes.rows.forEach(r => S.archetypes.push({ id: uid(), name: r.name, cast: r.cast, beats: r.beats })); }));
   }
 
   if (s === "bank") {
@@ -807,12 +966,18 @@ function renderForm() {
     add(el("div", { class: "acts" }, [
       el("button", { class: "btn", onclick: () => { S.bank.push({ id: uid(), label: "", items: "" }); renderForm(); } }, "Add category")
     ]));
+    const list = el("div", {}, EXEMPLAR.bank.rows.map(r => el("p", { class: "exemplar-text" }, [el("strong", {}, r.label + ": "), r.items])));
+    add(exemplarPanel(EXEMPLAR.bank.why, list, "Insert these categories",
+      () => { EXEMPLAR.bank.rows.forEach(r => S.bank.push({ id: uid(), label: r.label, items: r.items })); }));
   }
 
   if (s === "rules") {
     add(el("h2", {}, "Craft rules"));
     add(el("p", { class: "lede" }, "Short imperative lines. These do more work than long prose."));
     add(listEditor("Rules", "", S.rules, renderForm, "Nobody is bothered. Reaction kills it."));
+    const list = el("ul", { class: "exemplar-text" }, EXEMPLAR.rules.lines.map(l => el("li", {}, l)));
+    add(exemplarPanel(EXEMPLAR.rules.why, list, "Insert these rules",
+      () => { EXEMPLAR.rules.lines.forEach(l => S.rules.push(l)); }));
   }
 
   if (s === "safety") {
@@ -846,6 +1011,12 @@ function renderVideoExamples(pane) {
     add(el("div", { class: "acts" }, [
       el("button", { class: "btn primary", onclick: addExample }, "Add first example")
     ]));
+    if (S.kind === "video") {
+      add(exemplarPanel(EXEMPLAR.example.why,
+        exemplarText("A full worked example, structured the same way this tool builds one: style header, cast, five escalating shots, then soundscape and music."),
+        "Load reference example",
+        () => { const ex = EXEMPLAR.example.build(S); S.examples.push(ex); ui.example = ex.id; }));
+    }
     return;
   }
   if (!ui.example || !S.examples.some(e => e.id === ui.example)) ui.example = S.examples[0].id;
@@ -877,9 +1048,9 @@ function renderVideoExamples(pane) {
   row.appendChild(txt("Seed", "", () => ex.seed, v => ex.seed = v, { mono: true }));
   add(row);
 
-  add(txt("Style header", "Opens Shot 1. Look, camera, grade, production type.",
+  add(txt("Style header", "Precedes [Shot 1] as its own sentence — not glued onto the marker. Look, camera, grade, production type.",
     () => ex.styleHeader, v => ex.styleHeader = v, { area: true, rows: 3 }));
-  add(txt("Cast and setting", "Ages, clothing, expressions, location.",
+  add(txt("Cast and setting", "Opens [Shot 1] itself, right after the marker. Ages, clothing, expressions, location.",
     () => ex.cast, v => ex.cast = v, { area: true, rows: 3 }));
 
   const times = shotTimes(ex);
